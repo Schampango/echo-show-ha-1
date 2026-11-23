@@ -73,13 +73,34 @@ public class WebConfigServer extends NanoHTTPD {
         try { return Integer.parseInt(s.trim()); } catch (Exception e) { return def; }
     }
 
+    /** Baut aus den Zeilen-Feldern (t_name/t_entity) das interne Name|entity-Format. */
+    private String buildTiles(Map<String, List<String>> p, String fallback) {
+        List<String> names = p.get("t_name");
+        List<String> ents = p.get("t_entity");
+        if (names == null) {
+            // alte Textarea (Abwaertskompatibilitaet) oder unveraendert
+            String tt = first(p, "tiles_text");
+            return tt.length() > 0 ? tt : fallback;
+        }
+        StringBuilder tb = new StringBuilder();
+        for (int i = 0; i < names.size(); i++) {
+            String nm = names.get(i) == null ? "" : names.get(i).trim();
+            String en = (ents != null && i < ents.size() && ents.get(i) != null)
+                    ? ents.get(i).trim() : "";
+            if (nm.length() == 0 && en.length() == 0) continue;
+            if (tb.length() > 0) tb.append("\n");
+            tb.append(nm).append("|").append(en);
+        }
+        return tb.toString();
+    }
+
     private void saveFrom(Config old, Map<String, List<String>> p) {
         Config c = new Config();
         c.haUrl = first(p, "ha_url").trim();
         // Leere Secret-Felder = unveraendert lassen
         String tok = first(p, "ha_token");
         c.haToken = tok.length() > 0 ? tok.trim() : old.haToken;
-        c.tilesText = first(p, "tiles_text");
+        c.tilesText = buildTiles(p, old.tilesText);
         c.columns = Math.max(1, toInt(first(p, "columns"), 3));
         c.sshHost = first(p, "ssh_host").trim();
         c.sshPort = toInt(first(p, "ssh_port"), 22);
@@ -118,6 +139,10 @@ public class WebConfigServer extends NanoHTTPD {
         b.append("button{margin-top:20px;background:#3b6ea5;color:#fff;border:0;border-radius:8px;padding:12px 20px;font-size:15px;cursor:pointer;}");
         b.append(".ok{background:#244d2a;border:1px solid #3a7d44;padding:10px;border-radius:8px;margin-bottom:16px;}");
         b.append(".hint{color:#888;font-size:12px;}");
+        b.append(".tile-row{display:flex;gap:8px;margin-top:8px;align-items:center;}");
+        b.append(".tile-row input{flex:1;margin:0;}");
+        b.append(".del{background:#5a2a2a;color:#fff;border:0;border-radius:8px;padding:10px 14px;margin:0;cursor:pointer;}");
+        b.append(".addbtn{margin-top:10px;background:#2d4a2d;color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer;}");
         b.append("</style></head><body><div class=\"wrap\">");
         b.append("<h1>HA Panel &ndash; Konfiguration</h1>");
         if (saved) b.append("<div class=\"ok\">Gespeichert. Das Dashboard aktualisiert sich automatisch.</div>");
@@ -128,8 +153,22 @@ public class WebConfigServer extends NanoHTTPD {
         b.append("<label>Long-Lived Token <span class=\"hint\">(leer lassen = unver&auml;ndert)</span></label>");
         b.append("<input name=\"ha_token\" type=\"password\" value=\"\" placeholder=\"").append(c.haToken.length() > 0 ? "&bull;&bull;&bull; gesetzt" : "nicht gesetzt").append("\">");
 
-        b.append("<h2>Kacheln <span class=\"hint\">(je Zeile: Name|entity_id)</span></h2>");
-        b.append("<textarea name=\"tiles_text\">").append(esc(c.tilesText)).append("</textarea>");
+        b.append("<h2>Kacheln <span class=\"hint\">(Name und entity_id je Kachel)</span></h2>");
+        b.append("<div id=\"tiles\">");
+        for (String line : c.tilesText.split("\\n")) {
+            String s = line.trim();
+            if (s.length() == 0) continue;
+            int bar = s.indexOf('|');
+            String nm = bar >= 0 ? s.substring(0, bar).trim() : s;
+            String en = bar >= 0 ? s.substring(bar + 1).trim() : "";
+            b.append("<div class=\"tile-row\">");
+            b.append("<input name=\"t_name\" placeholder=\"Name\" value=\"").append(esc(nm)).append("\">");
+            b.append("<input name=\"t_entity\" placeholder=\"entity_id\" value=\"").append(esc(en)).append("\">");
+            b.append("<button type=\"button\" class=\"del\" onclick=\"this.parentNode.remove()\">✕</button>");
+            b.append("</div>");
+        }
+        b.append("</div>");
+        b.append("<button type=\"button\" class=\"addbtn\" onclick=\"addTile()\">+ Kachel</button>");
         b.append("<label>Spalten</label><input name=\"columns\" value=\"").append(c.columns).append("\">");
 
         b.append("<h2>Rollladen-Server (SSH)</h2>");
@@ -152,7 +191,14 @@ public class WebConfigServer extends NanoHTTPD {
         b.append("<input name=\"web_pass\" type=\"password\" value=\"\" placeholder=\"").append(c.webPass.length() > 0 ? "&bull;&bull;&bull; gesetzt" : "offen (kein Schutz)").append("\">");
 
         b.append("<br><button type=\"submit\">Speichern</button>");
-        b.append("</form></div></body></html>");
+        b.append("</form>");
+        b.append("<script>function addTile(){var d=document.getElementById('tiles');");
+        b.append("var r=document.createElement('div');r.className='tile-row';");
+        b.append("r.innerHTML=\"<input name='t_name' placeholder='Name'>");
+        b.append("<input name='t_entity' placeholder='entity_id'>");
+        b.append("<button type='button' class='del' onclick='this.parentNode.remove()'>✕</button>\";");
+        b.append("d.appendChild(r);}</script>");
+        b.append("</div></body></html>");
         return b.toString();
     }
 }
