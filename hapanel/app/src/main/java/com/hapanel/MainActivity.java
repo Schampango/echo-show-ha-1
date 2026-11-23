@@ -42,7 +42,7 @@ public class MainActivity extends Activity {
     private boolean polling = false;
 
     private static class Tile {
-        String name, entity;
+        String name, entity, iconKey;
         ImageView icon;
         boolean on;
     }
@@ -77,8 +77,10 @@ public class MainActivity extends Activity {
             };
             s.start(fi.iki.elonen.NanoHTTPD.SOCKET_READ_TIMEOUT, false);
             web = s;
+            Logg.add("Webserver gestartet: http://" + localIp() + ":" + c.webPort);
             toast("Konfig im Browser: http://" + localIp() + ":" + c.webPort);
         } catch (Exception e) {
+            Logg.add("Webserver-Start fehlgeschlagen: " + e.getMessage());
             toast("Webserver-Start fehlgeschlagen: " + e.getMessage());
         }
     }
@@ -166,6 +168,7 @@ public class MainActivity extends Activity {
             Tile t = new Tile();
             t.name = it[0];
             t.entity = it[1];
+            t.iconKey = it[2];
 
             LinearLayout cell = new LinearLayout(this);
             cell.setOrientation(LinearLayout.VERTICAL);
@@ -174,7 +177,7 @@ public class MainActivity extends Activity {
             cell.setPadding(dp(8), dp(10), dp(8), dp(10));
 
             ImageView icon = new ImageView(this);
-            icon.setImageResource(R.drawable.ic_bulb);
+            icon.setImageResource(Icons.res(t.iconKey));
             icon.setColorFilter(COL_OFF);
             LinearLayout.LayoutParams ip =
                     new LinearLayout.LayoutParams(dp(52), dp(52));
@@ -247,7 +250,7 @@ public class MainActivity extends Activity {
         ImageView stop = new ImageView(this);
         stop.setImageResource(R.drawable.ic_stop);
         stop.setColorFilter(COL_OFF);
-        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(dp(60), dp(60));
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(dp(70), dp(70));
         slp.topMargin = dp(10); slp.bottomMargin = dp(10);
         stop.setLayoutParams(slp);
         stop.setOnClickListener(new View.OnClickListener() {
@@ -275,21 +278,6 @@ public class MainActivity extends Activity {
         rollo.addView(rolloLbl);
         right.addView(rollo);
 
-        Button settings = new Button(this);
-        settings.setText("Einstellungen");
-        settings.setAllCaps(false);
-        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
-        blp.topMargin = dp(10);
-        settings.setLayoutParams(blp);
-        settings.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                startActivity(new Intent(MainActivity.this, SettingsActivity.class));
-            }
-        });
-        right.addView(settings);
-
         root.addView(right);
         setContentView(root);
         immersive();
@@ -300,7 +288,7 @@ public class MainActivity extends Activity {
         a.setImageResource(R.drawable.ic_arrow);
         a.setColorFilter(COL_OFF);
         if (down) a.setRotation(180f);
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(64), dp(64));
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(76), dp(76));
         a.setLayoutParams(p);
         return a;
     }
@@ -311,12 +299,14 @@ public class MainActivity extends Activity {
         for (String line : text.split("\\n")) {
             String s = line.trim();
             if (s.length() == 0) continue;
-            int bar = s.indexOf('|');
-            if (bar < 0) continue;
-            String name = s.substring(0, bar).trim();
-            String entity = s.substring(bar + 1).trim();
+            String[] parts = s.split("\\|", 3);
+            if (parts.length < 2) continue;
+            String name = parts[0].trim();
+            String entity = parts[1].trim();
             if (entity.length() == 0) continue;
-            out.add(new String[]{name, entity});
+            String icon = parts.length >= 3 ? parts[2].trim() : "bulb";
+            if (icon.length() == 0) icon = "bulb";
+            out.add(new String[]{name, entity, icon});
         }
         return out;
     }
@@ -337,10 +327,17 @@ public class MainActivity extends Activity {
     private void rolloCmd(final String command, final String label) {
         io.submit(new Runnable() {
             @Override public void run() {
+                Logg.add("Rollo " + label + ": SSH " + cfg.sshUser + "@" + cfg.sshHost
+                        + ":" + cfg.sshPort + "  cmd=\"" + command + "\""
+                        + (cfg.sshKey != null && cfg.sshKey.trim().length() > 0 ? "  (Key-Auth)" : "  (Passwort-Auth)"));
                 try {
-                    Ssh.run(cfg, command);
+                    String out = Ssh.run(cfg, command);
+                    String tr = out == null ? "" : out.trim();
+                    Logg.add("Rollo " + label + " OK" + (tr.length() > 0 ? ": " + tr : ""));
                     toast("Rollo: " + label);
                 } catch (Exception e) {
+                    Logg.add("Rollo " + label + " FEHLER: " + e.getClass().getSimpleName()
+                            + ": " + e.getMessage());
                     toast("SSH-Fehler: " + e.getMessage());
                 }
             }

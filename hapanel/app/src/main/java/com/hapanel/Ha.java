@@ -24,8 +24,12 @@ public class Ha {
             os.close();
             int code = h.getResponseCode();
             drain(h);
+            if (code < 200 || code >= 300) {
+                Logg.add("HA toggle " + entity + " -> HTTP " + code);
+            }
             return code >= 200 && code < 300;
         } catch (Exception e) {
+            Logg.add("HA toggle " + entity + " Fehler: " + e.getMessage());
             return false;
         } finally {
             if (h != null) h.disconnect();

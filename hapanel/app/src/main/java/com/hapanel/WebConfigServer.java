@@ -37,6 +37,16 @@ public class WebConfigServer extends NanoHTTPD {
             }
         }
 
+        String uri = session.getUri();
+        if (uri != null && uri.startsWith("/log")) {
+            if (Method.POST.equals(session.getMethod())) {
+                try { session.parseBody(new HashMap<String, String>()); } catch (Exception ignore) {}
+                Logg.clear();
+            }
+            return newFixedLengthResponse(
+                    Response.Status.OK, "text/html; charset=utf-8", logPage());
+        }
+
         boolean saved = false;
         if (Method.POST.equals(session.getMethod())) {
             try { session.parseBody(new HashMap<String, String>()); } catch (Exception ignore) {}
@@ -77,6 +87,7 @@ public class WebConfigServer extends NanoHTTPD {
     private String buildTiles(Map<String, List<String>> p, String fallback) {
         List<String> names = p.get("t_name");
         List<String> ents = p.get("t_entity");
+        List<String> icons = p.get("t_icon");
         if (names == null) {
             // alte Textarea (Abwaertskompatibilitaet) oder unveraendert
             String tt = first(p, "tiles_text");
@@ -87,9 +98,12 @@ public class WebConfigServer extends NanoHTTPD {
             String nm = names.get(i) == null ? "" : names.get(i).trim();
             String en = (ents != null && i < ents.size() && ents.get(i) != null)
                     ? ents.get(i).trim() : "";
+            String ic = (icons != null && i < icons.size() && icons.get(i) != null)
+                    ? icons.get(i).trim() : "bulb";
+            if (ic.length() == 0) ic = "bulb";
             if (nm.length() == 0 && en.length() == 0) continue;
             if (tb.length() > 0) tb.append("\n");
-            tb.append(nm).append("|").append(en);
+            tb.append(nm).append("|").append(en).append("|").append(ic);
         }
         return tb.toString();
     }
@@ -124,6 +138,38 @@ public class WebConfigServer extends NanoHTTPD {
                 .replace(">", "&gt;").replace("\"", "&quot;");
     }
 
+    private String iconOptions(String selected) {
+        StringBuilder o = new StringBuilder();
+        for (String[] opt : Icons.OPTIONS) {
+            o.append("<option value='").append(opt[0]).append("'");
+            if (opt[0].equals(selected)) o.append(" selected");
+            o.append(">").append(esc(opt[1])).append("</option>");
+        }
+        return o.toString();
+    }
+
+    private String logPage() {
+        StringBuilder b = new StringBuilder();
+        b.append("<!DOCTYPE html><html lang=\"de\"><head><meta charset=\"utf-8\">");
+        b.append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+        b.append("<meta http-equiv=\"refresh\" content=\"3\">");
+        b.append("<title>HA Panel - Log</title><style>");
+        b.append("body{background:#0d0d0d;color:#ececec;font-family:system-ui,Arial,sans-serif;margin:0;padding:24px;}");
+        b.append(".wrap{max-width:900px;margin:0 auto;}");
+        b.append("a{color:#6fa8dc;} h1{font-size:20px;}");
+        b.append("pre{background:#161616;border:1px solid #333;border-radius:8px;padding:12px;");
+        b.append("white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.5;max-height:70vh;overflow:auto;}");
+        b.append("button{background:#5a2a2a;color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer;}");
+        b.append("</style></head><body><div class=\"wrap\">");
+        b.append("<h1>Log <span style='font-size:13px;color:#888;'>(aktualisiert alle 3s)</span></h1>");
+        b.append("<p><a href=\"/\">&larr; Zur&uuml;ck zur Konfiguration</a></p>");
+        String d = Logg.dump();
+        b.append("<pre>").append(esc(d.length() == 0 ? "(noch keine Eintraege)" : d)).append("</pre>");
+        b.append("<form method=\"post\" action=\"/log\"><button type=\"submit\">Log leeren</button></form>");
+        b.append("</div></body></html>");
+        return b.toString();
+    }
+
     private String page(Config c, boolean saved) {
         StringBuilder b = new StringBuilder();
         b.append("<!DOCTYPE html><html lang=\"de\"><head><meta charset=\"utf-8\">");
@@ -141,10 +187,12 @@ public class WebConfigServer extends NanoHTTPD {
         b.append(".hint{color:#888;font-size:12px;}");
         b.append(".tile-row{display:flex;gap:8px;margin-top:8px;align-items:center;}");
         b.append(".tile-row input{flex:1;margin:0;}");
+        b.append(".tile-row select{flex:0 0 140px;background:#1e1e1e;border:1px solid #333;color:#ececec;border-radius:8px;padding:10px;margin:0;}");
         b.append(".del{background:#5a2a2a;color:#fff;border:0;border-radius:8px;padding:10px 14px;margin:0;cursor:pointer;}");
         b.append(".addbtn{margin-top:10px;background:#2d4a2d;color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer;}");
         b.append("</style></head><body><div class=\"wrap\">");
         b.append("<h1>HA Panel &ndash; Konfiguration</h1>");
+        b.append("<p><a href=\"/log\" style=\"color:#6fa8dc;\">&#9432; Log ansehen (SSH-/HA-Fehler)</a></p>");
         if (saved) b.append("<div class=\"ok\">Gespeichert. Das Dashboard aktualisiert sich automatisch.</div>");
         b.append("<form method=\"post\" action=\"/\">");
 
@@ -158,12 +206,15 @@ public class WebConfigServer extends NanoHTTPD {
         for (String line : c.tilesText.split("\\n")) {
             String s = line.trim();
             if (s.length() == 0) continue;
-            int bar = s.indexOf('|');
-            String nm = bar >= 0 ? s.substring(0, bar).trim() : s;
-            String en = bar >= 0 ? s.substring(bar + 1).trim() : "";
+            String[] parts = s.split("\\|", 3);
+            String nm = parts.length > 0 ? parts[0].trim() : "";
+            String en = parts.length > 1 ? parts[1].trim() : "";
+            String ic = parts.length > 2 ? parts[2].trim() : "bulb";
+            if (ic.length() == 0) ic = "bulb";
             b.append("<div class=\"tile-row\">");
             b.append("<input name=\"t_name\" placeholder=\"Name\" value=\"").append(esc(nm)).append("\">");
             b.append("<input name=\"t_entity\" placeholder=\"entity_id\" value=\"").append(esc(en)).append("\">");
+            b.append("<select name=\"t_icon\">").append(iconOptions(ic)).append("</select>");
             b.append("<button type=\"button\" class=\"del\" onclick=\"this.parentNode.remove()\">✕</button>");
             b.append("</div>");
         }
@@ -196,6 +247,7 @@ public class WebConfigServer extends NanoHTTPD {
         b.append("var r=document.createElement('div');r.className='tile-row';");
         b.append("r.innerHTML=\"<input name='t_name' placeholder='Name'>");
         b.append("<input name='t_entity' placeholder='entity_id'>");
+        b.append("<select name='t_icon'>").append(iconOptions("")).append("</select>");
         b.append("<button type='button' class='del' onclick='this.parentNode.remove()'>✕</button>\";");
         b.append("d.appendChild(r);}</script>");
         b.append("</div></body></html>");

@@ -4,6 +4,7 @@ import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
 
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.Properties;
 
@@ -36,9 +37,13 @@ public class Ssh {
         s.setConfig(cfg);
         s.connect(8000);
 
+        Logg.add("SSH verbunden: " + c.sshUser + "@" + c.sshHost + ":" + c.sshPort);
+
         ChannelExec ch = (ChannelExec) s.openChannel("exec");
         ch.setCommand(command);
         ch.setInputStream(null);
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        ch.setErrStream(err);
         InputStream in = ch.getInputStream();
         ch.connect();
 
@@ -58,8 +63,15 @@ public class Ssh {
                 Thread.sleep(100);
             }
         } finally {
+            int exit = ch.getExitStatus();
+            String errS = err.toString("UTF-8").trim();
+            Logg.add("SSH exit=" + exit + (errS.length() > 0 ? "  stderr=" + errS : ""));
             ch.disconnect();
             s.disconnect();
+            if (exit > 0) {
+                throw new Exception("Kommando-Exit " + exit
+                        + (errS.length() > 0 ? ": " + errS : ""));
+            }
         }
         return sb.toString();
     }
