@@ -55,7 +55,7 @@ public class SettingsActivity extends Activity {
         ePort = field(root, "Port", String.valueOf(c.sshPort), InputType.TYPE_CLASS_NUMBER);
         eUser = field(root, "User", c.sshUser, InputType.TYPE_CLASS_TEXT);
         ePass = field(root, "Passwort (leer, wenn Key)", c.sshPass, InputType.TYPE_TEXT_VARIATION_PASSWORD | InputType.TYPE_CLASS_TEXT);
-        eKey = field(root, "Privater Key (Pfad, optional)", c.sshKey, InputType.TYPE_CLASS_TEXT);
+        eKey = multiField(root, "Privater Key: kompletten Inhalt einfügen (-----BEGIN ...) oder Dateipfad", c.sshKey);
 
         root.addView(header("Rollo-Kommandos"));
         eUp = field(root, "Hoch", c.rolloUp, InputType.TYPE_CLASS_TEXT);

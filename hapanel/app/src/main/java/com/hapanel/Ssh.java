@@ -13,11 +13,22 @@ public class Ssh {
     /** Gibt die (kombinierte) Ausgabe zurueck; wirft bei Verbindungsfehler. */
     public static String run(Config c, String command) throws Exception {
         JSch jsch = new JSch();
-        if (c.sshKey != null && c.sshKey.trim().length() > 0) {
-            jsch.addIdentity(c.sshKey.trim());
+        String key = c.sshKey == null ? "" : c.sshKey.trim();
+        boolean usingKey = key.length() > 0;
+        if (usingKey) {
+            // SSH-Passwort dient bei Key-Auth als (optionale) Passphrase
+            byte[] passphrase = (c.sshPass != null && c.sshPass.length() > 0)
+                    ? c.sshPass.getBytes("UTF-8") : null;
+            if (key.startsWith("-----BEGIN")) {
+                // eingefuegter Key-Inhalt
+                jsch.addIdentity("rollo", key.getBytes("UTF-8"), null, passphrase);
+            } else {
+                // Pfad zu einer Key-Datei
+                jsch.addIdentity(key, passphrase);
+            }
         }
         Session s = jsch.getSession(c.sshUser, c.sshHost, c.sshPort);
-        if (c.sshPass != null && c.sshPass.length() > 0) {
+        if (!usingKey && c.sshPass != null && c.sshPass.length() > 0) {
             s.setPassword(c.sshPass);
         }
         Properties cfg = new Properties();

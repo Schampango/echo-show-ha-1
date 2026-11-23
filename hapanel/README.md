@@ -34,8 +34,11 @@ adb -s 192.168.1.48:5555 install -r app/build/outputs/apk/debug/app-debug.apk
 - **Kacheln**: je Zeile `Anzeigename|entity_id`, z.B. `Stehlampe|light.stehlampe`.
   Entity-IDs findest du in HA unter *Entwicklerwerkzeuge → Zustände*.
 - **Spalten**: Anzahl der Grid-Spalten (Screenshot = 3)
-- **SSH**: Host/IP, Port, User und Passwort **oder** Pfad zu einem privaten Key
-  (der Key muss auf dem Show liegen, z.B. `/sdcard/rollo_key`)
+- **SSH**: Host/IP, Port, User und entweder **Passwort** **oder** einen
+  **privaten Key**. Den Key am einfachsten als kompletten Inhalt
+  (`-----BEGIN ... KEY-----` … `-----END ... KEY-----`) ins Key-Feld einfügen
+  (empfohlen, keine Storage-Rechte nötig). Alternativ ein Dateipfad. Ist der Key
+  mit Passphrase geschützt, kommt die Passphrase ins Passwort-Feld.
 - **Rollo-Kommandos**: die Befehle, die per SSH ausgeführt werden, z.B.
   `/opt/rollo/rollo.sh up` / `... stop` / `... down`
 

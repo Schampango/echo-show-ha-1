@@ -86,7 +86,8 @@ public class WebConfigServer extends NanoHTTPD {
         c.sshUser = first(p, "ssh_user").trim();
         String sp = first(p, "ssh_pass");
         c.sshPass = sp.length() > 0 ? sp : old.sshPass;
-        c.sshKey = first(p, "ssh_key").trim();
+        String keyIn = first(p, "ssh_key").trim();
+        c.sshKey = keyIn.length() > 0 ? keyIn : old.sshKey;
         c.rolloUp = first(p, "rollo_up");
         c.rolloStop = first(p, "rollo_stop");
         c.rolloDown = first(p, "rollo_down");
@@ -137,7 +138,8 @@ public class WebConfigServer extends NanoHTTPD {
         b.append("<label>User</label><input name=\"ssh_user\" value=\"").append(esc(c.sshUser)).append("\">");
         b.append("<label>Passwort <span class=\"hint\">(leer lassen = unver&auml;ndert)</span></label>");
         b.append("<input name=\"ssh_pass\" type=\"password\" value=\"\" placeholder=\"").append(c.sshPass.length() > 0 ? "&bull;&bull;&bull; gesetzt" : "nicht gesetzt").append("\">");
-        b.append("<label>Privater Key (Pfad, optional)</label><input name=\"ssh_key\" value=\"").append(esc(c.sshKey)).append("\">");
+        b.append("<label>Privater Key <span class=\"hint\">(leer lassen = unver&auml;ndert; kompletten Inhalt -----BEGIN... einf&uuml;gen oder Pfad)</span></label>");
+        b.append("<textarea name=\"ssh_key\" placeholder=\"").append(c.sshKey.length() > 0 ? "&bull;&bull;&bull; gesetzt" : "nicht gesetzt").append("\"></textarea>");
 
         b.append("<h2>Rollo-Kommandos</h2>");
         b.append("<label>Hoch</label><input name=\"rollo_up\" value=\"").append(esc(c.rolloUp)).append("\">");
