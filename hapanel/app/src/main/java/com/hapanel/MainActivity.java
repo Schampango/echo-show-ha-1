@@ -36,6 +36,8 @@ public class MainActivity extends Activity {
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final List<Tile> tiles = new ArrayList<>();
 
+    private static WebConfigServer web;
+
     private Config cfg;
     private boolean polling = false;
 
@@ -55,6 +57,50 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         buildUi();
+        startWeb();
+    }
+
+    private void startWeb() {
+        if (web != null) return;
+        final Config c = Config.load(this);
+        try {
+            WebConfigServer s = new WebConfigServer(this, c.webPort);
+            s.onSaved = new Runnable() {
+                @Override public void run() {
+                    ui.post(new Runnable() {
+                        @Override public void run() {
+                            cfg = Config.load(MainActivity.this);
+                            buildUi();
+                        }
+                    });
+                }
+            };
+            s.start(fi.iki.elonen.NanoHTTPD.SOCKET_READ_TIMEOUT, false);
+            web = s;
+            toast("Konfig im Browser: http://" + localIp() + ":" + c.webPort);
+        } catch (Exception e) {
+            toast("Webserver-Start fehlgeschlagen: " + e.getMessage());
+        }
+    }
+
+    private String localIp() {
+        try {
+            java.util.Enumeration<java.net.NetworkInterface> ifs =
+                    java.net.NetworkInterface.getNetworkInterfaces();
+            while (ifs.hasMoreElements()) {
+                java.net.NetworkInterface nif = ifs.nextElement();
+                if (!nif.isUp() || nif.isLoopback()) continue;
+                java.util.Enumeration<java.net.InetAddress> addrs = nif.getInetAddresses();
+                while (addrs.hasMoreElements()) {
+                    java.net.InetAddress a = addrs.nextElement();
+                    if (!a.isLoopbackAddress() && a instanceof java.net.Inet4Address) {
+                        return a.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception ignore) {
+        }
+        return "<IP>";
     }
 
     @Override

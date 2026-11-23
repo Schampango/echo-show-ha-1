@@ -22,6 +22,7 @@ public class SettingsActivity extends Activity {
     private EditText eUrl, eToken, eTiles, eCols;
     private EditText eHost, ePort, eUser, ePass, eKey;
     private EditText eUp, eStop, eDown;
+    private EditText eWebPort, eWebPass;
 
     private int dp(int v) {
         return (int) TypedValue.applyDimension(
@@ -60,6 +61,11 @@ public class SettingsActivity extends Activity {
         eUp = field(root, "Hoch", c.rolloUp, InputType.TYPE_CLASS_TEXT);
         eStop = field(root, "Stop", c.rolloStop, InputType.TYPE_CLASS_TEXT);
         eDown = field(root, "Runter", c.rolloDown, InputType.TYPE_CLASS_TEXT);
+
+        root.addView(header("Web-Konfiguration (Browser)"));
+        eWebPort = field(root, "Web-Port", String.valueOf(c.webPort), InputType.TYPE_CLASS_NUMBER);
+        eWebPass = field(root, "Web-Passwort (leer = unverändert)", "",
+                InputType.TYPE_TEXT_VARIATION_PASSWORD | InputType.TYPE_CLASS_TEXT);
 
         Button save = new Button(this);
         save.setText("Speichern");
@@ -123,6 +129,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void save() {
+        Config old = Config.load(this);
         Config c = new Config();
         c.haUrl = eUrl.getText().toString().trim();
         c.haToken = eToken.getText().toString().trim();
@@ -136,6 +143,9 @@ public class SettingsActivity extends Activity {
         c.rolloUp = eUp.getText().toString();
         c.rolloStop = eStop.getText().toString();
         c.rolloDown = eDown.getText().toString();
+        c.webPort = parseInt(eWebPort, old.webPort);
+        String wp = eWebPass.getText().toString();
+        c.webPass = wp.length() > 0 ? wp : old.webPass;
         Config.save(this, c);
         Toast.makeText(this, "Gespeichert", Toast.LENGTH_SHORT).show();
         finish();

@@ -39,6 +39,28 @@ adb -s 192.168.1.48:5555 install -r app/build/outputs/apk/debug/app-debug.apk
 - **Rollo-Kommandos**: die Befehle, die per SSH ausgeführt werden, z.B.
   `/opt/rollo/rollo.sh up` / `... stop` / `... down`
 
+## Konfiguration per Browser (Web-Interface)
+
+Die App startet einen kleinen eingebauten Webserver. Beim App-Start zeigt ein
+Toast die Adresse, standardmäßig:
+
+```
+http://<Show-IP>:8080
+```
+
+Dort öffnet sich dieselbe Konfigurationsseite (HA, Kacheln, SSH, Rollo) im
+Browser eines beliebigen Geräts im Netz. „Speichern" schreibt die Einstellungen,
+und das Dashboard auf dem Show aktualisiert sich automatisch.
+
+- **Secrets** (HA-Token, SSH-Passwort): Felder bleiben im Browser leer —
+  leer lassen = unverändert. So werden sie nicht an den Browser zurückgegeben.
+- **Schutz**: Standardmäßig ist die Seite im LAN **ungeschützt**. Setze unter
+  *Web-Konfiguration → Web-Passwort* ein Passwort, dann ist die Seite per
+  HTTP-Basic-Auth geschützt. Ein geänderter Port greift nach App-Neustart.
+
+⚠️ Das läuft über **unverschlüsseltes HTTP** im lokalen Netz — ok fürs Heimnetz,
+aber nicht ins Internet exponieren.
+
 ## Funktionsweise
 
 - Schalten: `POST /api/services/homeassistant/toggle` mit `entity_id`

@@ -29,4 +29,6 @@ android {
 dependencies {
     // Gepflegter JSch-Fork (drop-in, Paket com.jcraft.jsch) fuer SSH
     implementation 'com.github.mwiede:jsch:0.2.21'
+    // Kleiner eingebetteter HTTP-Server fuer das Web-Konfig-Interface
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
 }

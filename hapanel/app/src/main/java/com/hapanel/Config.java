@@ -11,7 +11,8 @@ public class Config {
     public String haUrl, haToken, tilesText;
     public String sshHost, sshUser, sshPass, sshKey;
     public String rolloUp, rolloStop, rolloDown;
-    public int sshPort, columns;
+    public String webPass;
+    public int sshPort, columns, webPort;
 
     public static Config load(Context c) {
         SharedPreferences p = c.getSharedPreferences(PREF, Context.MODE_PRIVATE);
@@ -34,6 +35,8 @@ public class Config {
         x.rolloStop = p.getString("rollo_stop", "rollo.sh stop");
         x.rolloDown = p.getString("rollo_down", "rollo.sh down");
         x.columns  = p.getInt("columns", 3);
+        x.webPort  = p.getInt("web_port", 8080);
+        x.webPass  = p.getString("web_pass", "");
         return x;
     }
 
@@ -51,6 +54,8 @@ public class Config {
         e.putString("rollo_stop", x.rolloStop);
         e.putString("rollo_down", x.rolloDown);
         e.putInt("columns", x.columns);
+        e.putInt("web_port", x.webPort);
+        e.putString("web_pass", x.webPass);
         e.apply();
     }
 }
