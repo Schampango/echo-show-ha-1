@@ -335,8 +335,7 @@ public class MainActivity extends Activity {
         io.submit(new Runnable() {
             @Override public void run() {
                 Logg.add("Rollo " + label + ": SSH " + cfg.sshUser + "@" + cfg.sshHost
-                        + ":" + cfg.sshPort + "  cmd=\"" + command + "\""
-                        + (cfg.sshKey != null && cfg.sshKey.trim().length() > 0 ? "  (Key-Auth)" : "  (Passwort-Auth)"));
+                        + ":" + cfg.sshPort + "  cmd=\"" + command + "\"");
                 try {
                     String out = Ssh.run(cfg, command);
                     String tr = out == null ? "" : out.trim();

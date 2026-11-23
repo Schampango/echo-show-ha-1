@@ -120,9 +120,11 @@ public class WebConfigServer extends NanoHTTPD {
         c.sshPort = toInt(first(p, "ssh_port"), 22);
         c.sshUser = first(p, "ssh_user").trim();
         String sp = first(p, "ssh_pass");
-        c.sshPass = sp.length() > 0 ? sp : old.sshPass;
+        boolean clearPass = p.get("clear_pass") != null;
+        c.sshPass = clearPass ? "" : (sp.length() > 0 ? sp : old.sshPass);
         String keyIn = first(p, "ssh_key").trim();
-        c.sshKey = keyIn.length() > 0 ? keyIn : old.sshKey;
+        boolean clearKey = p.get("clear_key") != null;
+        c.sshKey = clearKey ? "" : (keyIn.length() > 0 ? keyIn : old.sshKey);
         c.rolloUp = first(p, "rollo_up");
         c.rolloStop = first(p, "rollo_stop");
         c.rolloDown = first(p, "rollo_down");
@@ -138,13 +140,50 @@ public class WebConfigServer extends NanoHTTPD {
                 .replace(">", "&gt;").replace("\"", "&quot;");
     }
 
-    private String iconOptions(String selected) {
-        StringBuilder o = new StringBuilder();
-        for (String[] opt : Icons.OPTIONS) {
-            o.append("<option value='").append(opt[0]).append("'");
-            if (opt[0].equals(selected)) o.append(" selected");
-            o.append(">").append(esc(opt[1])).append("</option>");
+    /** Inline-SVG fuer ein Icon (nur einfache Anfuehrungszeichen -> JS-sicher). */
+    private String iconSvg(String k) {
+        String open = "<svg viewBox='0 0 24 24' width='24' height='24'>";
+        String close = "</svg>";
+        if ("power".equals(k)) {
+            return open
+                    + "<path d='M12,3 L12,11' stroke='currentColor' stroke-width='2.2' fill='none' stroke-linecap='round'/>"
+                    + "<path d='M7.5,6.5 A7,7 0 1 0 16.5,6.5' stroke='currentColor' stroke-width='2.2' fill='none' stroke-linecap='round'/>"
+                    + close;
         }
+        String d;
+        switch (k) {
+            case "floorlamp":
+                d = "M9,3 L15,3 L17.5,9 L6.5,9 Z M11,9 L13,9 L13,19 L11,19 Z M7.5,19 L16.5,19 L16.5,21 L7.5,21 Z";
+                break;
+            case "plug":
+                d = "M8,2 L10,2 L10,7 L8,7 Z M14,2 L16,2 L16,7 L14,7 Z M6,7 L18,7 L18,12 A6,6 0 0 1 6,12 Z M11,18 L13,18 L13,22 L11,22 Z";
+                break;
+            case "fan":
+                d = "M12,12 L12,3 L15,7 Z M12,12 L21,12 L17,15 Z M12,12 L12,21 L9,17 Z M12,12 L3,12 L7,9 Z M10,12 A2,2 0 1 1 14,12 A2,2 0 1 1 10,12 Z";
+                break;
+            case "tv":
+                d = "M4,5 L20,5 A1.5,1.5 0 0 1 21.5,6.5 L21.5,16 A1.5,1.5 0 0 1 20,17.5 L4,17.5 A1.5,1.5 0 0 1 2.5,16 L2.5,6.5 A1.5,1.5 0 0 1 4,5 Z M8,20 L16,20 L16,21.5 L8,21.5 Z";
+                break;
+            case "bulb":
+            default:
+                d = "M9,2 L15,2 A1,1 0 0 1 16,3 L16,4 A2,2 0 0 1 18,6 L18,19 A3,3 0 0 1 15,22 L9,22 A3,3 0 0 1 6,19 L6,6 A2,2 0 0 1 8,4 L8,3 A1,1 0 0 1 9,2 Z";
+                break;
+        }
+        return open + "<path d='" + d + "' fill='currentColor'/>" + close;
+    }
+
+    /** Icon-Auswahl: anklickbare Symbole + verstecktes t_icon-Feld. */
+    private String iconPicker(String selected) {
+        StringBuilder o = new StringBuilder();
+        o.append("<div class='iconpick'>");
+        o.append("<input type='hidden' name='t_icon' value='").append(selected).append("'>");
+        for (String[] opt : Icons.OPTIONS) {
+            String k = opt[0];
+            o.append("<span class='ico").append(k.equals(selected) ? " sel" : "")
+                    .append("' data-k='").append(k).append("' title='").append(esc(opt[1]))
+                    .append("' onclick='pick(this)'>").append(iconSvg(k)).append("</span>");
+        }
+        o.append("</div>");
         return o.toString();
     }
 
@@ -185,9 +224,14 @@ public class WebConfigServer extends NanoHTTPD {
         b.append("button{margin-top:20px;background:#3b6ea5;color:#fff;border:0;border-radius:8px;padding:12px 20px;font-size:15px;cursor:pointer;}");
         b.append(".ok{background:#244d2a;border:1px solid #3a7d44;padding:10px;border-radius:8px;margin-bottom:16px;}");
         b.append(".hint{color:#888;font-size:12px;}");
-        b.append(".tile-row{display:flex;gap:8px;margin-top:8px;align-items:center;}");
-        b.append(".tile-row input{flex:1;margin:0;}");
-        b.append(".tile-row select{flex:0 0 140px;background:#1e1e1e;border:1px solid #333;color:#ececec;border-radius:8px;padding:10px;margin:0;}");
+        b.append("label.chk{display:flex;align-items:center;gap:8px;color:#bbb;font-size:13px;margin-top:8px;}");
+        b.append("label.chk input{width:auto;}");
+        b.append(".tile-row{margin-top:12px;border:1px solid #2a2a2a;border-radius:10px;padding:8px;}");
+        b.append(".tr-top{display:flex;gap:8px;align-items:center;}");
+        b.append(".tr-top input{flex:1;margin:0;}");
+        b.append(".iconpick{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}");
+        b.append(".ico{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border:2px solid #333;border-radius:8px;color:#9fb6cc;cursor:pointer;}");
+        b.append(".ico.sel{border-color:#f5c518;color:#f5c518;background:#241f08;}");
         b.append(".del{background:#5a2a2a;color:#fff;border:0;border-radius:8px;padding:10px 14px;margin:0;cursor:pointer;}");
         b.append(".addbtn{margin-top:10px;background:#2d4a2d;color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer;}");
         b.append("</style></head><body><div class=\"wrap\">");
@@ -212,10 +256,12 @@ public class WebConfigServer extends NanoHTTPD {
             String ic = parts.length > 2 ? parts[2].trim() : "bulb";
             if (ic.length() == 0) ic = "bulb";
             b.append("<div class=\"tile-row\">");
+            b.append("<div class=\"tr-top\">");
             b.append("<input name=\"t_name\" placeholder=\"Name\" value=\"").append(esc(nm)).append("\">");
             b.append("<input name=\"t_entity\" placeholder=\"entity_id\" value=\"").append(esc(en)).append("\">");
-            b.append("<select name=\"t_icon\">").append(iconOptions(ic)).append("</select>");
-            b.append("<button type=\"button\" class=\"del\" onclick=\"this.parentNode.remove()\">✕</button>");
+            b.append("<button type=\"button\" class=\"del\" onclick=\"this.closest('.tile-row').remove()\">✕</button>");
+            b.append("</div>");
+            b.append(iconPicker(ic));
             b.append("</div>");
         }
         b.append("</div>");
@@ -228,8 +274,10 @@ public class WebConfigServer extends NanoHTTPD {
         b.append("<label>User</label><input name=\"ssh_user\" value=\"").append(esc(c.sshUser)).append("\">");
         b.append("<label>Passwort <span class=\"hint\">(leer lassen = unver&auml;ndert)</span></label>");
         b.append("<input name=\"ssh_pass\" type=\"password\" value=\"\" placeholder=\"").append(c.sshPass.length() > 0 ? "&bull;&bull;&bull; gesetzt" : "nicht gesetzt").append("\">");
+        b.append("<label class=\"chk\"><input type=\"checkbox\" name=\"clear_pass\" value=\"1\"> Passwort entfernen</label>");
         b.append("<label>Privater Key <span class=\"hint\">(leer lassen = unver&auml;ndert; kompletten Inhalt -----BEGIN... einf&uuml;gen oder Pfad)</span></label>");
         b.append("<textarea name=\"ssh_key\" placeholder=\"").append(c.sshKey.length() > 0 ? "&bull;&bull;&bull; gesetzt" : "nicht gesetzt").append("\"></textarea>");
+        b.append("<label class=\"chk\"><input type=\"checkbox\" name=\"clear_key\" value=\"1\"> Key entfernen (dann nur Passwort-Auth)</label>");
 
         b.append("<h2>Rollo-Kommandos</h2>");
         b.append("<label>Hoch</label><input name=\"rollo_up\" value=\"").append(esc(c.rolloUp)).append("\">");
@@ -243,13 +291,21 @@ public class WebConfigServer extends NanoHTTPD {
 
         b.append("<br><button type=\"submit\">Speichern</button>");
         b.append("</form>");
-        b.append("<script>function addTile(){var d=document.getElementById('tiles');");
+        b.append("<script>");
+        b.append("function pick(el){var p=el.closest('.iconpick');");
+        b.append("p.querySelector(\"input[name='t_icon']\").value=el.getAttribute('data-k');");
+        b.append("var s=p.querySelectorAll('.ico');for(var i=0;i<s.length;i++){s[i].classList.remove('sel');}");
+        b.append("el.classList.add('sel');}");
+        b.append("function addTile(){var d=document.getElementById('tiles');");
         b.append("var r=document.createElement('div');r.className='tile-row';");
-        b.append("r.innerHTML=\"<input name='t_name' placeholder='Name'>");
+        b.append("r.innerHTML=\"<div class='tr-top'><input name='t_name' placeholder='Name'>");
         b.append("<input name='t_entity' placeholder='entity_id'>");
-        b.append("<select name='t_icon'>").append(iconOptions("")).append("</select>");
-        b.append("<button type='button' class='del' onclick='this.parentNode.remove()'>✕</button>\";");
-        b.append("d.appendChild(r);}</script>");
+        b.append("<button type='button' class='del'>✕</button></div>");
+        b.append(iconPicker("bulb"));
+        b.append("\";");
+        b.append("r.querySelector('.del').onclick=function(){r.remove();};");
+        b.append("d.appendChild(r);}");
+        b.append("</script>");
         b.append("</div></body></html>");
         return b.toString();
     }

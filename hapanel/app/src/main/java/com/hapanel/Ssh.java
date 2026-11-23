@@ -16,22 +16,27 @@ public class Ssh {
         JSch jsch = new JSch();
         String key = c.sshKey == null ? "" : c.sshKey.trim();
         boolean usingKey = key.length() > 0;
+        boolean havePass = c.sshPass != null && c.sshPass.length() > 0;
         if (usingKey) {
             // SSH-Passwort dient bei Key-Auth als (optionale) Passphrase
-            byte[] passphrase = (c.sshPass != null && c.sshPass.length() > 0)
-                    ? c.sshPass.getBytes("UTF-8") : null;
-            if (key.startsWith("-----BEGIN")) {
-                // eingefuegter Key-Inhalt
-                jsch.addIdentity("rollo", key.getBytes("UTF-8"), null, passphrase);
-            } else {
-                // Pfad zu einer Key-Datei
-                jsch.addIdentity(key, passphrase);
+            byte[] passphrase = havePass ? c.sshPass.getBytes("UTF-8") : null;
+            try {
+                if (key.startsWith("-----BEGIN")) {
+                    jsch.addIdentity("rollo", key.getBytes("UTF-8"), null, passphrase);
+                } else {
+                    jsch.addIdentity(key, passphrase);
+                }
+            } catch (Exception keyErr) {
+                Logg.add("SSH: Key konnte nicht geladen werden: " + keyErr.getMessage());
             }
         }
         Session s = jsch.getSession(c.sshUser, c.sshHost, c.sshPort);
-        if (!usingKey && c.sshPass != null && c.sshPass.length() > 0) {
+        // Passwort IMMER setzen, wenn vorhanden -> JSch probiert Key und dann Passwort
+        if (havePass) {
             s.setPassword(c.sshPass);
         }
+        Logg.add("SSH Auth-Methoden: key=" + (usingKey ? "ja" : "nein")
+                + ", passwort=" + (havePass ? "ja" : "nein"));
         Properties cfg = new Properties();
         cfg.put("StrictHostKeyChecking", "no");
         s.setConfig(cfg);
