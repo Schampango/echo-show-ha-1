@@ -31,9 +31,7 @@ public class MainActivity extends Activity {
     private static final int COL_ON     = 0xFFF5C518; // amber = an
     private static final int COL_OFF    = 0xFF4A80C0; // blau = aus (Ruhe)
     private static final int COL_TEXT   = 0xFFECECEC;
-    private static final int COL_ACTIVE = 0xFFF5C518; // amber = laeuft
-    private static final int COL_OK     = 0xFF46A758; // gruen = ok
-    private static final int COL_ERR    = 0xFFCF4B3C; // rot = fehler
+    private static final int COL_ACTIVE = 0xFFFF8C00; // orange = Touch-Feedback
 
     private final ExecutorService io = Executors.newFixedThreadPool(4);
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -328,44 +326,26 @@ public class MainActivity extends Activity {
     }
 
     private void onRolloTap(final ImageView btn, final String command, final String label) {
-        // Sofort-Feedback: kurz einruecken + "laeuft"-Farbe
+        // Touch-Feedback: 1 Sekunde orange aufleuchten, dann zurueck
         btn.setColorFilter(COL_ACTIVE);
-        btn.animate().scaleX(0.85f).scaleY(0.85f).setDuration(80)
-                .withEndAction(new Runnable() {
-                    @Override public void run() {
-                        btn.animate().scaleX(1f).scaleY(1f).setDuration(80).start();
-                    }
-                }).start();
+        ui.postDelayed(new Runnable() {
+            @Override public void run() { btn.setColorFilter(COL_OFF); }
+        }, 1000);
 
         io.submit(new Runnable() {
             @Override public void run() {
                 Logg.add("Rollo " + label + ": SSH " + cfg.sshUser + "@" + cfg.sshHost
                         + ":" + cfg.sshPort + "  cmd=\"" + command + "\""
                         + (cfg.sshKey != null && cfg.sshKey.trim().length() > 0 ? "  (Key-Auth)" : "  (Passwort-Auth)"));
-                boolean ok;
-                String err = null;
                 try {
                     String out = Ssh.run(cfg, command);
                     String tr = out == null ? "" : out.trim();
                     Logg.add("Rollo " + label + " OK" + (tr.length() > 0 ? ": " + tr : ""));
-                    ok = true;
                 } catch (Exception e) {
-                    err = e.getMessage();
                     Logg.add("Rollo " + label + " FEHLER: " + e.getClass().getSimpleName()
-                            + ": " + err);
-                    ok = false;
+                            + ": " + e.getMessage());
+                    toast("SSH-Fehler: " + e.getMessage());
                 }
-                final boolean fok = ok;
-                final String ferr = err;
-                ui.post(new Runnable() {
-                    @Override public void run() {
-                        btn.setColorFilter(fok ? COL_OK : COL_ERR);
-                        toast(fok ? ("Rollo: " + label) : ("SSH-Fehler: " + ferr));
-                        ui.postDelayed(new Runnable() {
-                            @Override public void run() { btn.setColorFilter(COL_OFF); }
-                        }, 900);
-                    }
-                });
             }
         });
     }
