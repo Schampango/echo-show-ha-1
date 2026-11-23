@@ -29,8 +29,11 @@ public class MainActivity extends Activity {
     private static final int COL_BG     = 0xFF0D0D0D;
     private static final int COL_CARD   = 0xFF262626;
     private static final int COL_ON     = 0xFFF5C518; // amber = an
-    private static final int COL_OFF    = 0xFF4A80C0; // blau = aus
+    private static final int COL_OFF    = 0xFF4A80C0; // blau = aus (Ruhe)
     private static final int COL_TEXT   = 0xFFECECEC;
+    private static final int COL_ACTIVE = 0xFFF5C518; // amber = laeuft
+    private static final int COL_OK     = 0xFF46A758; // gruen = ok
+    private static final int COL_ERR    = 0xFFCF4B3C; // rot = fehler
 
     private final ExecutorService io = Executors.newFixedThreadPool(4);
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -243,22 +246,22 @@ public class MainActivity extends Activity {
                         LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
         rollo.setLayoutParams(rollolp);
 
-        ImageView up = arrowView(false);
+        final ImageView up = arrowView(false);
         up.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { rolloCmd(cfg.rolloUp, "Hoch"); }
+            @Override public void onClick(View v) { onRolloTap(up, cfg.rolloUp, "Hoch"); }
         });
-        ImageView stop = new ImageView(this);
+        final ImageView stop = new ImageView(this);
         stop.setImageResource(R.drawable.ic_stop);
         stop.setColorFilter(COL_OFF);
         LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(dp(70), dp(70));
         slp.topMargin = dp(10); slp.bottomMargin = dp(10);
         stop.setLayoutParams(slp);
         stop.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { rolloCmd(cfg.rolloStop, "Stop"); }
+            @Override public void onClick(View v) { onRolloTap(stop, cfg.rolloStop, "Stop"); }
         });
-        ImageView down = arrowView(true);
+        final ImageView down = arrowView(true);
         down.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { rolloCmd(cfg.rolloDown, "Runter"); }
+            @Override public void onClick(View v) { onRolloTap(down, cfg.rolloDown, "Runter"); }
         });
 
         TextView rolloLbl = new TextView(this);
@@ -324,22 +327,45 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void rolloCmd(final String command, final String label) {
+    private void onRolloTap(final ImageView btn, final String command, final String label) {
+        // Sofort-Feedback: kurz einruecken + "laeuft"-Farbe
+        btn.setColorFilter(COL_ACTIVE);
+        btn.animate().scaleX(0.85f).scaleY(0.85f).setDuration(80)
+                .withEndAction(new Runnable() {
+                    @Override public void run() {
+                        btn.animate().scaleX(1f).scaleY(1f).setDuration(80).start();
+                    }
+                }).start();
+
         io.submit(new Runnable() {
             @Override public void run() {
                 Logg.add("Rollo " + label + ": SSH " + cfg.sshUser + "@" + cfg.sshHost
                         + ":" + cfg.sshPort + "  cmd=\"" + command + "\""
                         + (cfg.sshKey != null && cfg.sshKey.trim().length() > 0 ? "  (Key-Auth)" : "  (Passwort-Auth)"));
+                boolean ok;
+                String err = null;
                 try {
                     String out = Ssh.run(cfg, command);
                     String tr = out == null ? "" : out.trim();
                     Logg.add("Rollo " + label + " OK" + (tr.length() > 0 ? ": " + tr : ""));
-                    toast("Rollo: " + label);
+                    ok = true;
                 } catch (Exception e) {
+                    err = e.getMessage();
                     Logg.add("Rollo " + label + " FEHLER: " + e.getClass().getSimpleName()
-                            + ": " + e.getMessage());
-                    toast("SSH-Fehler: " + e.getMessage());
+                            + ": " + err);
+                    ok = false;
                 }
+                final boolean fok = ok;
+                final String ferr = err;
+                ui.post(new Runnable() {
+                    @Override public void run() {
+                        btn.setColorFilter(fok ? COL_OK : COL_ERR);
+                        toast(fok ? ("Rollo: " + label) : ("SSH-Fehler: " + ferr));
+                        ui.postDelayed(new Runnable() {
+                            @Override public void run() { btn.setColorFilter(COL_OFF); }
+                        }, 900);
+                    }
+                });
             }
         });
     }
